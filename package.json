@@ -1,0 +1,28 @@
+{
+  "name": "dawnia-server",
+  "version": "1.0.0",
+  "description": "Dawnia Server",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "dev:dawnia": "tsc -w & npx tsx build/servers/dawnia.js",
+    "start:dawnia": "npx tsx build/servers/dawnia.js",
+    "pm2:dawnia": "pm2 startOrGracefulReload pm2-dawnia.json"
+  },
+  "files": [
+    "build"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.7",
+    "fastmcp": "^1.23.1",
+    "nanoid": "^5.1.5",
+    "qiniu": "^7.14.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}
