@@ -6,38 +6,50 @@ const server = new FastMCP({
     name: servers[ServerName].name,
     version: servers[ServerName].version,
 });
+const getActionBaseSchema = z.object({
+    // date: z.string().describe(`
+    //   日期，格式为 yyyy-MM-dd
+    // `),
+    date: z.string().refine((s) => /^\d{4}-\d{2}-\d{2}$/.test(s), {
+        message: "date must be in YYYY-MM-DD",
+    }),
+});
+function branch(action, lmSchema) {
+    return getActionBaseSchema.extend({
+        action: z.literal(action),
+        lm: lmSchema,
+    });
+}
+const getActionSchemas = {
+    getLm: z
+        .object({
+        action: z.literal("getLm"),
+        lm: z.enum(["none"]).default("none").describe(`
+      栏目类型
+      none: 不获取栏目
+    `),
+    })
+        .and(getActionBaseSchema),
+    getNews: z
+        .object({
+        action: z.literal("getNews"),
+        lm: z.enum(["xwlb", "other"]).default("other").describe(`
+      栏目类型
+      xwlb: 新闻联播
+      other: 其他
+    `),
+    })
+        .and(getActionBaseSchema),
+    noop: z.object({}).and(getActionBaseSchema),
+};
 server.addTool({
     name: "getAction",
     description: "从用户输入中解析出具体动作",
-    parameters: z.object({
-        action: z
-            .enum([
-            "getLm",
-            "getSubscribedLm",
-            "subscribeLm",
-            "unsubscribeLm",
-            "getNews",
-            "noop",
-        ])
-            .default("noop").describe(`
-      具体动作类型
-      getLm: 获取栏目
-      getSubscribedLm: 获取订阅的栏目
-      subscribeLm: 订阅栏目
-      unsubscribeLm: 取消订阅栏目
-      getNews: 获取新闻
-      noop: 什么都不做
-    `),
-        lm: z
-            .string(z.enum(["none", "xwlb", "other"]))
-            .min(1)
-            .default("none").describe(`
-      栏目名称
-    `),
-        date: z.string().default(new Date().toISOString().split("T")[0]).describe(`
-      日期，格式为 yyyy-MM-dd
-    `),
-    }),
+    parameters: z.discriminatedUnion("action", [
+        branch("getLm", z.enum(["none"])),
+        branch("getNews", z.enum(["xwlb", "other"])),
+        branch("noop", z.object({})),
+    ]),
     execute: async (args) => {
         return {
             content: [
@@ -45,7 +57,7 @@ server.addTool({
                     type: "text",
                     text: `${JSON.stringify({
                         action: args.action,
-                        lm: args.lm || "none",
+                        lm: args.lm,
                         date: args.date,
                     })}`,
                 },
