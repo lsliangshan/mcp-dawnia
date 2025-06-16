@@ -1,6 +1,7 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { servers } from "../config/index.js";
+import { getBilibiliVideo } from "../services/puppeteer.js";
 const ServerName = "dawnia";
 const server = new FastMCP({
     name: servers[ServerName].name,
@@ -47,6 +48,28 @@ server.addTool({
                         action: args.action,
                         lm: args.lm || "none",
                         date: args.date,
+                    })}`,
+                },
+            ],
+        };
+    },
+});
+server.addTool({
+    name: "downloadVideo",
+    description: "下载视频",
+    parameters: z.object({
+        url: z.string().describe(`
+      视频链接
+    `),
+    }),
+    execute: async (args) => {
+        const video = await getBilibiliVideo(args.url);
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `${JSON.stringify({
+                        url: video,
                     })}`,
                 },
             ],
