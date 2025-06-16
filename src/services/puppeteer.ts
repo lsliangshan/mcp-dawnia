@@ -3,9 +3,7 @@ import puppeteer from "puppeteer";
 
 export async function getBilibiliVideo(url: string) {
   // Launch the browser and open a new blank page
-  const browser = await puppeteer.launch({
-    headless: false,
-  });
+  const browser = await puppeteer.launch();
   const page = await browser.newPage();
 
   // Navigate the page to a URL.
@@ -20,15 +18,28 @@ export async function getBilibiliVideo(url: string) {
   // Wait and click on first result.
   await page.locator("button.group.bg-blue-700").click();
   await page.waitForSelector("[data-testid='flowbite-card']");
-  const videoUrl = await page.$eval("a.group.bg-blue-700", (el) => el.href);
-  // const videoUrl = await page.$eval(
-  //   "[data-testid='flowbite-card'] a",
-  //   (el) => el.href
-  // );
-  console.log(videoUrl);
+  const name = await page.$eval(
+    "[data-testid='flowbite-card'] .font-medium",
+    (el) => el.textContent
+  );
+  const poster = await page.$eval(
+    "[data-testid='flowbite-card'] a.group.bg-white",
+    (el) => el.href
+  );
+  const videoUrl = await page.$eval("[data-testid='flowbite-card'] a.group.bg-blue-700", (el) => el.href);
+
+  console.log({
+    name,
+    poster,
+    url: videoUrl,
+  });
 
   await browser.close();
-  return videoUrl;
+  return {
+    name,
+    poster,
+    url: videoUrl,
+  };
 }
 
 // getBilibiliVideo(

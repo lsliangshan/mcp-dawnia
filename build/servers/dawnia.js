@@ -8,6 +8,28 @@ const server = new FastMCP({
     version: servers[ServerName].version,
 });
 server.addTool({
+    name: "downloadVideo",
+    description: "下载视频",
+    parameters: z.object({
+        url: z.string().describe(`
+      视频链接
+    `),
+    }),
+    execute: async (args) => {
+        const videoResult = await getBilibiliVideo(args.url);
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `${JSON.stringify({
+                        ...videoResult,
+                    })}`,
+                },
+            ],
+        };
+    },
+});
+server.addTool({
     name: "getAction",
     description: "从用户输入中解析出具体动作",
     parameters: z.object({
@@ -19,6 +41,7 @@ server.addTool({
             "unsubscribeLm",
             "getNews",
             "noop",
+            "downloadVideo",
         ])
             .default("noop").describe(`
       具体动作类型
@@ -28,6 +51,7 @@ server.addTool({
       unsubscribeLm: 取消订阅栏目
       getNews: 获取新闻
       noop: 什么都不做
+      downloadVideo: 下载视频
     `),
         lm: z
             .string(z.enum(["none", "xwlb", "other"]))
@@ -37,6 +61,15 @@ server.addTool({
     `),
         date: z.string().default(new Date().toISOString().split("T")[0]).describe(`
       日期，格式为 yyyy-MM-dd
+    `),
+        url: z.string().describe(`
+      视频链接
+    `),
+        name: z.string().describe(`
+      视频名称
+    `),
+        poster: z.string().describe(`
+      视频海报
     `),
     }),
     execute: async (args) => {
@@ -48,28 +81,6 @@ server.addTool({
                         action: args.action,
                         lm: args.lm || "none",
                         date: args.date,
-                    })}`,
-                },
-            ],
-        };
-    },
-});
-server.addTool({
-    name: "downloadVideo",
-    description: "下载视频",
-    parameters: z.object({
-        url: z.string().describe(`
-      视频链接
-    `),
-    }),
-    execute: async (args) => {
-        const video = await getBilibiliVideo(args.url);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `${JSON.stringify({
-                        url: video,
                     })}`,
                 },
             ],
