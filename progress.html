@@ -11,7 +11,7 @@
   <script>
     const query = new URLSearchParams(window.location.search);
     const id = query.get("id");
-    const es = new EventSource(`http://10.2.6.210:29060/progress/${id}`);
+    const es = new EventSource(`http://127.0.0.1:29060/progress/${id}`);
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.progress) {

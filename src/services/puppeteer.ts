@@ -3,6 +3,7 @@ import { mergeVideo } from "./ffmpeg.js";
 import os from "os";
 import path from "path";
 import { createCursor } from "ghost-cursor";
+import { upload, UploadResponse } from "./qiniu.js";
 
 async function getBilibiliMediaInfo(page: Page) {
   const name = await page.$eval(
@@ -80,17 +81,29 @@ async function getYoutubeMediaInfo(params: {
               });
               reject(err);
             },
-            onEnd: (outputPath) => {
-              onEnd?.({
-                name,
-                poster,
+            onEnd: async (outputPath) => {
+              // 上传文件
+              const res: UploadResponse = await upload({
                 url: outputPath,
+                deleteAfterDays: 30,
+                deleteSource: true,
               });
-              resolve({
-                name,
-                poster,
-                url: outputPath,
-              });
+
+              if (res.code === 200) {
+                // 上传成功
+                onEnd?.({
+                  name,
+                  poster,
+                  url: res.data?.url,
+                });
+                resolve({
+                  name,
+                  poster,
+                  url: res.data?.url,
+                });
+              } else {
+                reject(new Error(res.message));
+              }
             },
           });
           // return {
@@ -128,7 +141,6 @@ export async function getVideo(params: {
 }) {
   return new Promise(async (resolve, reject) => {
     const browser = await puppeteer.launch({
-      headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
     try {
@@ -181,7 +193,6 @@ export async function getVideo(params: {
         mediaInfo = await getBilibiliMediaInfo(page);
       }
 
-      console.log(pageUrl);
       await browser.close();
       resolve({
         ...mediaInfo,

@@ -1,5 +1,6 @@
 import { unlinkSync } from "fs";
 import qiniu from "qiniu";
+import { getRandomId } from "../utils/random.js";
 qiniu.conf.ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
 qiniu.conf.SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
 const ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
@@ -7,8 +8,8 @@ const SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
 const bucket = "static-dei2";
 export function upload(params) {
     return new Promise((resolve) => {
-        const filename = params.filename || params.url.split("/").pop();
-        let key = (params.path || "tmp/") + filename || null;
+        const filename = params.filename || `${getRandomId()}.mp4`;
+        let key = (params.path || "omniplay/") + filename || null;
         let mac = new qiniu.auth.digest.Mac(ACCESS_KEY, SECRET_KEY);
         let options = {
             scope: bucket + (key ? ":" + key : ""),

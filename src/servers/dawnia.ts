@@ -24,10 +24,16 @@ server.addTool({
     id: z.string().describe(`
       任务id
     `),
+    nickname: z.string().describe(`
+      用户昵称
+    `),
+    userId: z.string().describe(`
+      用户id
+    `),
   }),
   execute: async (args: any) => {
-    const id = args.id;
-
+    const { id, nickname, userId } = args;
+    console.log(`https://omniplay-progress.qyflows.com/${id}`);
     const listeners: Array<(d: unknown) => void> = [];
     queues.set(id, listeners);
 
@@ -35,20 +41,21 @@ server.addTool({
       const result: any = await getVideo({
         url: args.url,
         onProgress: (percent) => {
-          console.log(`[3333progress]: ${percent}`);
           queues
             .get(id)
             ?.forEach((fn) => fn({ progress: Math.min(100, percent) }));
         },
         onEnd: (info) => {
-          queues.delete(id);
+          // queues.delete(id);
           queues.get(id)?.forEach((fn) => fn({ progress: 100 }));
 
           axios.post(
-            "https://wf.qyflows.com/webhook-test/omniplay/video-download",
+            "https://wf.qyflows.com/webhook/omniplay/video-download",
             {
               code: 200,
               id,
+              nickname,
+              userId,
               progress: 100,
               data: {
                 ...info,
@@ -60,11 +67,13 @@ server.addTool({
           queues.delete(id);
           console.log(`[3333error]: ${error}`);
           axios.post(
-            "https://wf.qyflows.com/webhook-test/omniplay/video-download",
+            "https://wf.qyflows.com/webhook/omniplay/video-download",
             {
               code: 1001,
               id,
               message: error.message,
+              nickname,
+              userId,
               data: {
                 ...info,
               },
@@ -80,12 +89,12 @@ server.addTool({
           },
         ],
       };
-    } catch (e) {
+    } catch (e: any) {
       return {
         content: [
           {
             type: "text",
-            text: `${JSON.stringify({ error: e })}`,
+            text: `${JSON.stringify({ error: e.message })}`,
           },
         ],
       };
@@ -138,6 +147,12 @@ server.addTool({
     id: z.string().describe(`
       任务id
     `),
+    nickname: z.string().describe(`
+      用户昵称
+    `),
+    userId: z.string().describe(`
+      用户id
+    `),
   }),
   execute: async (args: any) => {
     return {
@@ -145,9 +160,12 @@ server.addTool({
         {
           type: "text",
           text: `${JSON.stringify({
+            id: args.id,
             action: args.action,
             lm: args.lm || "none",
             date: args.date,
+            nickname: args.nickname,
+            userId: args.userId,
           })}`,
         },
       ],
@@ -218,6 +236,104 @@ app.get("/progress/:id", (req, res) => {
       arr.filter((fn) => fn !== push)
     );
   });
+});
+
+app.get('/:id', (req, res) => {
+  const { id } = req.params;
+  res.send(`
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Download Progress</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    /* layout */
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 25% 25%,#0d1b2a 0%,#000 80%);
+      font:16px/1.5 "Segoe UI",system-ui,sans-serif;color:#fff}
+    .wrap{width:80%;max-width:600px;text-align:center;
+      padding:40px 32px;border-radius:20px;
+      background:rgba(255,255,255,.05);
+      box-shadow:0 0 30px rgba(0,255,255,.25)}
+    /* bar shell */
+    .bar{position:relative;width:100%;height:30px;overflow:hidden;
+      border-radius:15px;background:rgba(255,255,255,.15);margin-top:24px}
+    /* animated stripes */
+    .bar::before{
+      content:"";position:absolute;inset:0;width:200%;
+      background:repeating-linear-gradient(120deg,
+        rgba(0,255,255,.4) 0 10px,
+        rgba(0,255,255,.1) 10px 20px);
+      animation:stripes 2s linear infinite}
+    @keyframes stripes{to{transform:translateX(-50%)}}
+    /* filled track */
+    .fill{position:absolute;inset:0;width:0;height:100%;
+      background:linear-gradient(90deg,#00c9ff 0%,#92fe9d 100%);
+      box-shadow:0 0 10px #00c9ff;transition:width .2s ease-out}
+    /* text + btn */
+    .pct{margin-top:22px;font-size:2rem;letter-spacing:2px}
+    button{margin-top:28px;padding:12px 28px;border:0;border-radius:30px;cursor:pointer;
+      font-weight:600;font-size:1rem;color:#000;
+      background:linear-gradient(90deg,#00c9ff,#92fe9d);transition:transform .2s}
+    button:hover{transform:scale(1.05)}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="region" aria-label="Download progress">
+    <h1>视频下载中…</h1>
+    <div class="bar" aria-hidden="true"><div class="fill"></div></div>
+    <div class="pct" aria-live="polite">0%</div>
+    
+  </div>
+
+<script>
+(() => {
+  const fill  = document.querySelector('.fill');
+  const text  = document.querySelector('.pct');
+  let source;
+
+  /** Open SSE stream and wire events */
+  function connect(){
+    const url = 'https://omniplay-progress.qyflows.com/progress/${id}';
+    source?.close();
+    source = new EventSource(url);
+
+    source.addEventListener('message', ev => {
+      let v;
+      try {
+        const obj = JSON.parse(ev.data);
+        v = obj.percent ?? obj.percentage ?? obj.progress ?? obj;
+      } catch { v = ev.data; }
+      v = Math.max(0, Math.min(100, Number(v)));
+
+      fill.style.width = v + '%';
+      text.textContent = isNaN(v) ? '连接中...' : (v.toFixed(2) + '%');
+
+      if (v >= 100){
+        text.textContent = '完成';
+        source.close();
+      }
+    });
+
+    source.addEventListener('error', err => {
+      console.error('SSE error', err);
+      text.textContent = '连接失败';
+      fill.style.width = '0%';
+      source.close();
+    });
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>
+
+
+  `);                 // res.send 会自动加 Content-Type:text/html :contentReference[oaicite:0]{index=0}
 });
 
 app.listen(29060, () => console.log("SSE 监听 http://localhost:29060"));

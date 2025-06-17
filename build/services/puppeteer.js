@@ -3,6 +3,7 @@ import { mergeVideo } from "./ffmpeg.js";
 import os from "os";
 import path from "path";
 import { createCursor } from "ghost-cursor";
+import { upload } from "./qiniu.js";
 async function getBilibiliMediaInfo(page) {
     const name = await page.$eval("[data-testid='flowbite-card'] .font-medium", (el) => el.textContent);
     const poster = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载封面") || {}).href);
@@ -41,17 +42,29 @@ async function getYoutubeMediaInfo(params) {
                             });
                             reject(err);
                         },
-                        onEnd: (outputPath) => {
-                            onEnd?.({
-                                name,
-                                poster,
+                        onEnd: async (outputPath) => {
+                            // 上传文件
+                            const res = await upload({
                                 url: outputPath,
+                                deleteAfterDays: 30,
+                                deleteSource: true,
                             });
-                            resolve({
-                                name,
-                                poster,
-                                url: outputPath,
-                            });
+                            if (res.code === 200) {
+                                // 上传成功
+                                onEnd?.({
+                                    name,
+                                    poster,
+                                    url: res.data?.url,
+                                });
+                                resolve({
+                                    name,
+                                    poster,
+                                    url: res.data?.url,
+                                });
+                            }
+                            else {
+                                reject(new Error(res.message));
+                            }
                         },
                     });
                     // return {
@@ -84,7 +97,6 @@ async function getYoutubeMediaInfo(params) {
 export async function getVideo(params) {
     return new Promise(async (resolve, reject) => {
         const browser = await puppeteer.launch({
-            headless: false,
             args: ["--no-sandbox", "--disable-setuid-sandbox"],
         });
         try {
@@ -130,7 +142,6 @@ export async function getVideo(params) {
             else {
                 mediaInfo = await getBilibiliMediaInfo(page);
             }
-            console.log(pageUrl);
             await browser.close();
             resolve({
                 ...mediaInfo,

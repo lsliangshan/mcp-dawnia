@@ -18,7 +18,7 @@ export function mergeVideo(params) {
             .audioCodec("aac")
             .videoCodec("copy")
             .on("end", (stdout) => {
-            params.onEnd?.(stdout ?? "");
+            params.onEnd?.(params.outputPath);
             resolve(params.outputPath);
         })
             .on("start", (stdout) => {
