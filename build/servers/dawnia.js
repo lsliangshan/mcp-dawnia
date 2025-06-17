@@ -1,7 +1,10 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { servers } from "../config/index.js";
-import { getBilibiliVideo } from "../services/puppeteer.js";
+import { getVideo } from "../services/puppeteer.js";
+import express from "express";
+import axios from "axios";
+const queues = new Map();
 const ServerName = "dawnia";
 const server = new FastMCP({
     name: servers[ServerName].name,
@@ -14,19 +17,67 @@ server.addTool({
         url: z.string().describe(`
       视频链接
     `),
+        id: z.string().describe(`
+      任务id
+    `),
     }),
     execute: async (args) => {
-        const videoResult = await getBilibiliVideo(args.url);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `${JSON.stringify({
-                        ...videoResult,
-                    })}`,
+        const id = args.id;
+        const listeners = [];
+        queues.set(id, listeners);
+        try {
+            const result = await getVideo({
+                url: args.url,
+                onProgress: (percent) => {
+                    console.log(`[3333progress]: ${percent}`);
+                    queues
+                        .get(id)
+                        ?.forEach((fn) => fn({ progress: Math.min(100, percent) }));
                 },
-            ],
-        };
+                onEnd: (info) => {
+                    queues.delete(id);
+                    queues.get(id)?.forEach((fn) => fn({ progress: 100 }));
+                    axios.post("https://wf.qyflows.com/webhook-test/omniplay/video-download", {
+                        code: 200,
+                        id,
+                        progress: 100,
+                        data: {
+                            ...info,
+                        },
+                    });
+                },
+                onError: (error, info) => {
+                    queues.delete(id);
+                    console.log(`[3333error]: ${error}`);
+                    axios.post("https://wf.qyflows.com/webhook-test/omniplay/video-download", {
+                        code: 1001,
+                        id,
+                        message: error.message,
+                        data: {
+                            ...info,
+                        },
+                    });
+                },
+            });
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `${JSON.stringify({ ...result })}`,
+                    },
+                ],
+            };
+        }
+        catch (e) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `${JSON.stringify({ error: e })}`,
+                    },
+                ],
+            };
+        }
     },
 });
 server.addTool({
@@ -70,6 +121,9 @@ server.addTool({
     `),
         poster: z.string().describe(`
       视频海报
+    `),
+        id: z.string().describe(`
+      任务id
     `),
     }),
     execute: async (args) => {
@@ -121,3 +175,24 @@ server.start({
     },
 });
 export default server;
+// 3️⃣ 独立 SSE 服务
+const app = express();
+app.get("/progress/:id", (req, res) => {
+    const { id } = req.params;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    const push = (data) => res.write(`data:${JSON.stringify(data)}\n\n`);
+    queues.get(id)?.push(push); // 注册监听
+    push({ connected: true });
+    const ping = setInterval(() => res.write(":ping\n\n"), 15000);
+    req.on("close", () => {
+        clearInterval(ping);
+        const arr = queues.get(id) ?? [];
+        queues.set(id, arr.filter((fn) => fn !== push));
+    });
+});
+app.listen(29060, () => console.log("SSE 监听 http://localhost:29060"));

@@ -105,8 +105,8 @@ server.on("disconnect", (event) => {
 });
 
 server.start({
-  transportType: servers[ServerName].transportType,
-  sse: {
+  transportType: "httpStream", // servers[ServerName].transportType,
+  httpStream: {
     endpoint: servers[ServerName].path,
     port: servers[ServerName].port,
   },
