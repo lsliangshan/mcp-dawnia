@@ -1,5 +1,26 @@
 import puppeteer from "puppeteer";
-// Or import puppeteer from 'puppeteer-core';
+async function getBilibiliMediaInfo(page) {
+    const name = await page.$eval("[data-testid='flowbite-card'] .font-medium", (el) => el.textContent);
+    const poster = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载封面") || {}).href);
+    const url = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载视频") || {}).href);
+    return {
+        name,
+        poster,
+        url: url,
+    };
+}
+async function getYoutubeMediaInfo(page) {
+    const name = await page.$eval("[data-testid='flowbite-card'] div.font-medium", (el) => el.textContent);
+    const poster = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载封面") || {}).href);
+    const audio = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载音频") || {}).href);
+    const video = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim().match(/\d{3,}P（mp4）/i)) || {}).href);
+    return {
+        name,
+        poster,
+        audio,
+        video,
+    };
+}
 export async function getBilibiliVideo(url) {
     // Launch the browser and open a new blank page
     const browser = await puppeteer.launch();
@@ -13,19 +34,20 @@ export async function getBilibiliVideo(url) {
     // Wait and click on first result.
     await page.locator("button.group.bg-blue-700").click();
     await page.waitForSelector("[data-testid='flowbite-card']");
-    const name = await page.$eval("[data-testid='flowbite-card'] .font-medium", (el) => el.textContent);
-    const poster = await page.$eval("[data-testid='flowbite-card'] a.group.bg-white", (el) => el.href);
-    const videoUrl = await page.$eval("[data-testid='flowbite-card'] a.group.bg-blue-700", (el) => el.href);
+    const pageUrl = await page.url();
+    let mediaInfo = {};
+    if (pageUrl.includes("youtube")) {
+        mediaInfo = await getYoutubeMediaInfo(page);
+    }
+    else {
+        mediaInfo = await getBilibiliMediaInfo(page);
+    }
     console.log({
-        name,
-        poster,
-        url: videoUrl,
+        ...mediaInfo,
     });
-    await browser.close();
+    // await browser.close();
     return {
-        name,
-        poster,
-        url: videoUrl,
+        ...mediaInfo,
     };
 }
 // getBilibiliVideo(
