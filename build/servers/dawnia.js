@@ -57,16 +57,19 @@ server.addTool({
                 onError: (error, info) => {
                     queues.delete(id);
                     console.log(`[3333error]: ${error}`);
-                    axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
-                        code: 1001,
-                        id,
-                        message: error.message,
-                        nickname,
-                        userId,
-                        data: {
-                            ...info,
-                        },
-                    });
+                    // axios.post(
+                    //   "https://wf.qyflows.com/webhook/omniplay/video-download",
+                    //   {
+                    //     code: 1001,
+                    //     id,
+                    //     message: error.message,
+                    //     nickname,
+                    //     userId,
+                    //     data: {
+                    //       ...info,
+                    //     },
+                    //   }
+                    // );
                 },
             });
             return {
@@ -214,7 +217,7 @@ app.get("/progress/:id", (req, res) => {
         queues.set(id, arr.filter((fn) => fn !== push));
     });
 });
-app.get('/:id', (req, res) => {
+app.get("/:id", (req, res) => {
     const { id } = req.params;
     res.send(`
     <!DOCTYPE html>
@@ -273,7 +276,7 @@ app.get('/:id', (req, res) => {
 
   /** Open SSE stream and wire events */
   function connect(){
-    const url = 'https://omniplay-progress.qyflows.com/progress/${id}';
+    const url = '/progress/${id}';
     source?.close();
     source = new EventSource(url);
 

@@ -49,36 +49,33 @@ server.addTool({
           // queues.delete(id);
           queues.get(id)?.forEach((fn) => fn({ progress: 100 }));
 
-          axios.post(
-            "https://wf.qyflows.com/webhook/omniplay/video-download",
-            {
-              code: 200,
-              id,
-              nickname,
-              userId,
-              progress: 100,
-              data: {
-                ...info,
-              },
-            }
-          );
+          axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
+            code: 200,
+            id,
+            nickname,
+            userId,
+            progress: 100,
+            data: {
+              ...info,
+            },
+          });
         },
         onError: (error, info) => {
           queues.delete(id);
           console.log(`[3333error]: ${error}`);
-          axios.post(
-            "https://wf.qyflows.com/webhook/omniplay/video-download",
-            {
-              code: 1001,
-              id,
-              message: error.message,
-              nickname,
-              userId,
-              data: {
-                ...info,
-              },
-            }
-          );
+          // axios.post(
+          //   "https://wf.qyflows.com/webhook/omniplay/video-download",
+          //   {
+          //     code: 1001,
+          //     id,
+          //     message: error.message,
+          //     nickname,
+          //     userId,
+          //     data: {
+          //       ...info,
+          //     },
+          //   }
+          // );
         },
       });
       return {
@@ -238,7 +235,7 @@ app.get("/progress/:id", (req, res) => {
   });
 });
 
-app.get('/:id', (req, res) => {
+app.get("/:id", (req, res) => {
   const { id } = req.params;
   res.send(`
     <!DOCTYPE html>
@@ -297,7 +294,7 @@ app.get('/:id', (req, res) => {
 
   /** Open SSE stream and wire events */
   function connect(){
-    const url = 'https://omniplay-progress.qyflows.com/progress/${id}';
+    const url = '/progress/${id}';
     source?.close();
     source = new EventSource(url);
 
@@ -333,7 +330,7 @@ app.get('/:id', (req, res) => {
 </html>
 
 
-  `);                 // res.send 会自动加 Content-Type:text/html :contentReference[oaicite:0]{index=0}
+  `); // res.send 会自动加 Content-Type:text/html :contentReference[oaicite:0]{index=0}
 });
 
 app.listen(29060, () => console.log("SSE 监听 http://localhost:29060"));

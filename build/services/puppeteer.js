@@ -4,6 +4,8 @@ import os from "os";
 import path from "path";
 import { createCursor } from "ghost-cursor";
 import { upload } from "./qiniu.js";
+import { getRandomId } from "../utils/random.js";
+import fs from "fs";
 async function getBilibiliMediaInfo(page) {
     const name = await page.$eval("[data-testid='flowbite-card'] .font-medium", (el) => el.textContent);
     const poster = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载封面") || {}).href);
@@ -14,21 +16,116 @@ async function getBilibiliMediaInfo(page) {
         url: url,
     };
 }
+function downloadVideo(browser, url, fileName) {
+    return new Promise(async (resolve, reject) => {
+        const page = await browser.newPage();
+        await page.goto(url);
+        try {
+            await page.setRequestInterception(true);
+            page.on("response", async (res) => {
+                const ct = res.headers()["content-type"] || "";
+                if (ct.startsWith("video/") || res.url().endsWith(".mp4")) {
+                    const buf = await res.buffer(); // Puppeteer >= 18
+                    const file = path.join(os.tmpdir(), fileName);
+                    fs.writeFileSync(file, buf);
+                    console.log("保存成功 →", file);
+                }
+            });
+            resolve(true);
+        }
+        catch (error) {
+            reject(error);
+        }
+        finally {
+            page.off("response");
+            await page.close();
+        }
+    });
+}
 async function getYoutubeMediaInfo(params) {
     return new Promise(async (resolve, reject) => {
         try {
-            const { page, onProgress, onEnd, onError } = params;
+            const { page, browser, onProgress, onEnd, onError, onStart } = params;
             const name = await page.$eval("[data-testid='flowbite-card'] div.font-medium", (el) => el.textContent);
             const poster = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载封面") || {})
                 .href);
             const audio = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim() === "下载音频") || {})
                 .href);
             const video = await page.$$eval("[data-testid='flowbite-card'] a", (elements) => (elements.find((el) => el.textContent?.trim().match(/\d{3,}P（mp4）/i)) || {}).href);
+            onStart?.();
             if (video && audio) {
+                await page.goto(video);
+                // 下载音频、视频
+                // 服务器端 ffmpeg直接处理音频、视频地址，报错 403
+                // 所以需要先下载音频、视频，再进行合并
+                // 下载音频、视频
+                const tmpAudioFileName = `audio_${getRandomId()}.mp4`;
+                const tmpVideoFileName = `video_${getRandomId()}.mp4`;
+                const audioPath = path.resolve(os.tmpdir(), tmpAudioFileName);
+                const videoPath = path.resolve(os.tmpdir(), tmpVideoFileName);
+                console.log("音频地址:", audioPath);
+                console.log("视频地址:", videoPath);
+                await downloadVideo(browser, video, tmpVideoFileName);
+                // await page.evaluate(
+                //   async ({ u, tmpVideoFileName }) => {
+                //     console.log("@@@@@@下载视频:", u);
+                //     const a = document.createElement("a");
+                //     a.style.cssText =
+                //       "position: absolute; top: 0; left: 0; width: 100px; height: 100px; background-color: red;";
+                //     a.href = u;
+                //     a.download = "";
+                //     a.innerText = "下载视频";
+                //     document.body.append(a);
+                //     a.click();
+                //     // a.remove();
+                //   },
+                //   { u: video, tmpVideoFileName }
+                // );
+                // await Promise.all([
+                //   page.evaluate(
+                //     async ({ u, tmpAudioFileName }) => {
+                //       console.log("下载音频:", u);
+                //       const resp = await fetch(u);
+                //       const blob = await resp.blob();
+                //       const a = document.createElement("a");
+                //       a.href = URL.createObjectURL(blob);
+                //       a.download = tmpAudioFileName;
+                //       document.body.append(a);
+                //       a.click();
+                //       a.remove();
+                //     },
+                //     { u: audio, tmpAudioFileName }
+                //   ),
+                //   page.evaluate(
+                //     async ({ u, tmpVideoFileName }) => {
+                //       const resp = await fetch(u);
+                //       const blob = await resp.blob();
+                //       const a = document.createElement("a");
+                //       a.href = URL.createObjectURL(blob);
+                //       a.download = tmpVideoFileName;
+                //       document.body.append(a);
+                //       a.click();
+                //       a.remove();
+                //     },
+                //     { u: video, tmpVideoFileName }
+                //   ),
+                // ]);
+                // const waitAll = (expect: number) =>
+                //   new Promise<void>((res) => {
+                //     const done = new Set<string>();
+                //     console.log("下载进度2222:", done);
+                //     client.on("Browser.downloadProgress", (e) => {
+                //       console.log("下载进度:", e);
+                //       if (e.state === "completed") done.add(e.guid);
+                //       if (done.size === expect) res();
+                //     });
+                //   });
+                // await waitAll(2);
                 try {
+                    console.log("开始合并视频");
                     await mergeVideo({
-                        videoUrl: video ?? "",
-                        audioUrl: audio ?? "",
+                        videoUrl: path.resolve(os.tmpdir(), tmpVideoFileName),
+                        audioUrl: path.resolve(os.tmpdir(), tmpAudioFileName),
                         outputPath: path.resolve(os.tmpdir(), `${name}.mp4`),
                         onProgress: (percent) => {
                             onProgress?.(percent);
@@ -90,6 +187,7 @@ async function getYoutubeMediaInfo(params) {
             };
         }
         catch (error) {
+            console.log("下载失败:", error);
             reject(error);
         }
     });
@@ -97,10 +195,11 @@ async function getYoutubeMediaInfo(params) {
 export async function getVideo(params) {
     return new Promise(async (resolve, reject) => {
         const browser = await puppeteer.launch({
+            headless: false,
             args: ["--no-sandbox", "--disable-setuid-sandbox"],
         });
         try {
-            const { url, onProgress, onEnd, onError } = params;
+            const { url, onProgress, onEnd, onError, onStart } = params;
             // Launch the browser and open a new blank page
             const page = await browser.newPage();
             const cursor = createCursor(page);
@@ -112,7 +211,7 @@ export async function getVideo(params) {
                 "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
             });
             // Navigate the page to a URL.
-            await page.goto("https://snapany.com/zh");
+            await page.goto("http://snapany.com/zh");
             // Set screen size.
             await page.setViewport({
                 width: 1080 + Math.floor(Math.random() * 100),
@@ -122,7 +221,7 @@ export async function getVideo(params) {
             // await page.locator("input").focus();
             await cursor.move("input");
             await cursor.click();
-            await page.keyboard.type(url);
+            await page.keyboard.type(url, { delay: 100 });
             // Wait and click on first result.
             await page.locator("button.group.bg-blue-700").click();
             await page.waitForSelector("[data-testid='flowbite-card']");
@@ -131,6 +230,15 @@ export async function getVideo(params) {
             if (pageUrl.includes("/youtube")) {
                 mediaInfo = await getYoutubeMediaInfo({
                     page,
+                    browser,
+                    onStart: () => {
+                        onStart?.();
+                        resolve({
+                            name: "",
+                            poster: "",
+                            url: "",
+                        });
+                    },
                     onProgress,
                     onEnd,
                     onError: (error, info) => {
@@ -142,13 +250,13 @@ export async function getVideo(params) {
             else {
                 mediaInfo = await getBilibiliMediaInfo(page);
             }
-            await browser.close();
+            // await browser.close();
             resolve({
                 ...mediaInfo,
             });
         }
         catch (error) {
-            await browser.close();
+            // await browser.close();
             reject(error);
         }
     });
