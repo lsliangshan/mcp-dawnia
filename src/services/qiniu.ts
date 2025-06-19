@@ -17,6 +17,7 @@ export interface UploadOptions {
   deleteAfterDays?: number;
   // 是否删除源文件
   deleteSource?: boolean;
+  onProgress?: (info: { percent: number }) => void;
 }
 
 export interface UploadResponse {
@@ -51,7 +52,12 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
     // putExtra.resumeRecordFile = 'progress.log'
     putExtra.progressCallback = (uploadBytes, totalBytes) => {
       // console.log('progress: ', uploadBytes + ' / ' + totalBytes, parseFloat(uploadBytes * 100 / totalBytes).toFixed(2) + '%')
-      // params.progress && params.progress(uploadBytes, totalBytes)
+      params.onProgress?.({
+        percent: Math.min(
+          100,
+          Number(parseFloat(`${(uploadBytes * 100) / totalBytes}`).toFixed(2))
+        ),
+      });
     };
 
     let _url = params.url;
@@ -79,7 +85,7 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
           if (params.deleteSource) {
             unlinkSync(params.url);
           }
-
+          params.onProgress?.({ percent: 100 });
           resolve({
             code: 200,
             data: {

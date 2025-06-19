@@ -28,7 +28,9 @@ export function upload(params) {
         // putExtra.resumeRecordFile = 'progress.log'
         putExtra.progressCallback = (uploadBytes, totalBytes) => {
             // console.log('progress: ', uploadBytes + ' / ' + totalBytes, parseFloat(uploadBytes * 100 / totalBytes).toFixed(2) + '%')
-            // params.progress && params.progress(uploadBytes, totalBytes)
+            params.onProgress?.({
+                percent: Math.min(100, Number(parseFloat(`${(uploadBytes * 100) / totalBytes}`).toFixed(2))),
+            });
         };
         let _url = params.url;
         // if (_url.match(/^https?:\/\//)) {
@@ -49,6 +51,7 @@ export function upload(params) {
                 if (params.deleteSource) {
                     unlinkSync(params.url);
                 }
+                params.onProgress?.({ percent: 100 });
                 resolve({
                     code: 200,
                     data: {

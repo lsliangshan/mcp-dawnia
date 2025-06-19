@@ -1,7 +1,7 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { servers } from "../config/index.js";
-import { getVideo } from "../services/puppeteer.js";
+import { getVideo } from "../services/video.js";
 import express from "express";
 import axios from "axios";
 const queues = new Map();
@@ -35,41 +35,35 @@ server.addTool({
         try {
             const result = await getVideo({
                 url: args.url,
-                onProgress: (percent) => {
-                    queues
-                        .get(id)
-                        ?.forEach((fn) => fn({ progress: Math.min(100, percent) }));
+                onProgress: (info) => {
+                    queues.get(id)?.forEach((fn) => fn(info));
                 },
                 onEnd: (info) => {
                     // queues.delete(id);
-                    queues.get(id)?.forEach((fn) => fn({ progress: 100 }));
+                    queues.get(id)?.forEach((fn) => fn({ ...info, percent: 100 }));
+                    console.log(`[3333info]: `, JSON.stringify(info));
                     axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
                         code: 200,
                         id,
                         nickname,
                         userId,
-                        progress: 100,
                         data: {
                             ...info,
                         },
                     });
                 },
-                onError: (error, info) => {
+                onError: (info) => {
                     queues.delete(id);
-                    console.log(`[3333error]: ${error}`);
-                    // axios.post(
-                    //   "https://wf.qyflows.com/webhook/omniplay/video-download",
-                    //   {
-                    //     code: 1001,
-                    //     id,
-                    //     message: error.message,
-                    //     nickname,
-                    //     userId,
-                    //     data: {
-                    //       ...info,
-                    //     },
-                    //   }
-                    // );
+                    console.log(`[3333error]: ${info}`);
+                    axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
+                        code: 1001,
+                        id,
+                        nickname,
+                        userId,
+                        data: {
+                            ...info,
+                        },
+                    });
                 },
             });
             return {
@@ -201,7 +195,7 @@ export default server;
 const app = express();
 app.get("/progress/:id", (req, res) => {
     const { id } = req.params;
-    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -246,7 +240,7 @@ app.get("/:id", (req, res) => {
       background:repeating-linear-gradient(120deg,
         rgba(0,255,255,.4) 0 10px,
         rgba(0,255,255,.1) 10px 20px);
-      animation:stripes 2s linear infinite}
+      animation:stripes 10s linear infinite}
     @keyframes stripes{to{transform:translateX(-50%)}}
     /* filled track */
     .fill{position:absolute;inset:0;width:0;height:100%;
@@ -262,16 +256,29 @@ app.get("/:id", (req, res) => {
 </head>
 <body>
   <div class="wrap" role="region" aria-label="Download progress">
-    <h1>视频下载中…</h1>
+    <h1 class="status"></h1>
+    <h5 class="title"></h5>
     <div class="bar" aria-hidden="true"><div class="fill"></div></div>
+    
+    <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-top: 20px;">
+    <div class="info" style="display: flex; flex-direction: column; align-items: flex-start; opacity: 0;">
+        <div>下载速度: <span class="speed"></span></div>
+        <div>剩余时间: <span class="eta"></span></div>
+    </div>
     <div class="pct" aria-live="polite">0%</div>
+    </div>
     
   </div>
 
 <script>
 (() => {
   const fill  = document.querySelector('.fill');
+  const status  = document.querySelector('.status');
+  const title  = document.querySelector('.title');
   const text  = document.querySelector('.pct');
+  const info  = document.querySelector('.info');
+  const speed  = document.querySelector('.speed');
+  const eta  = document.querySelector('.eta');
   let source;
 
   /** Open SSE stream and wire events */
@@ -282,17 +289,40 @@ app.get("/:id", (req, res) => {
 
     source.addEventListener('message', ev => {
       let v;
+      let obj;
       try {
-        const obj = JSON.parse(ev.data);
+        obj = JSON.parse(ev.data);
         v = obj.percent ?? obj.percentage ?? obj.progress ?? obj;
-      } catch { v = ev.data; }
+      } catch { 
+       obj = {
+        statusText: "视频下载中...",
+        title: '',
+        info: {
+          name: "",
+          poster: "",
+          url: "",
+        },
+       };
+       v = ev.data;
+        }
       v = Math.max(0, Math.min(100, Number(v)));
+
+      console.log('>>>>> ', JSON.stringify(obj));
 
       fill.style.width = v + '%';
       text.textContent = isNaN(v) ? '连接中...' : (v.toFixed(2) + '%');
 
-      if (v >= 100){
+      status.textContent = obj.statusText;
+      title.textContent = obj.info ? obj.info.name : "";
+      info.style.opacity = obj.speed && obj.eta ? '1' : '0';
+      speed.textContent = obj.speed || '';
+      eta.textContent = obj.eta || '';
+
+      if (obj.status === 'completed' && v >= 100){
         text.textContent = '完成';
+        source.close();
+      } else if (obj.status === 'failed') {
+        text.textContent = '失败';
         source.close();
       }
     });
