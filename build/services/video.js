@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { upload } from "./qiniu.js";
+import { getRandomId } from "../utils/random.js";
 var ProgressTitle;
 (function (ProgressTitle) {
     ProgressTitle["Analyzing"] = "\u89C6\u9891\u89E3\u6790\u4E2D";
@@ -30,9 +31,7 @@ export function getVideo(params) {
                 .split("Writing video metadata as JSON to: ")[1]
                 .trim();
         }
-        // process.stdout.write(line); // 直接回显到控制台（可删）
-        const m = line.match(/\[download]\s+([\d.]+)%.*?at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/);
-        if (m) {
+        setTimeout(() => {
             if (!videoInfo.name && existsSync(videoJsonFile)) {
                 // 视频元数据json
                 const info = JSON.parse(readFileSync(videoJsonFile, "utf-8"));
@@ -41,6 +40,10 @@ export function getVideo(params) {
                 videoInfo.url = `${basePath}/${info.title}.mp4`;
                 unlinkSync(videoJsonFile);
             }
+        }, 10);
+        // process.stdout.write(line); // 直接回显到控制台（可删）
+        const m = line.match(/\[download]\s+([\d.]+)%.*?at\s+([\d.]+\w+\/s)\s+ETA\s+([\d:]+)/);
+        if (m) {
             // percent: 进度百分比，如 42.5，不包括%
             // speed: 速度，如 3.10MiB/s
             // eta: 剩余时间，如 00:01
@@ -56,6 +59,7 @@ export function getVideo(params) {
             });
         }
     }
+    const imgId = `img-${getRandomId()}`;
     // 构造参数数组而不是整串命令，避免 Windows / Linux 转义差异
     const args = [
         "-f",
@@ -67,8 +71,17 @@ export function getVideo(params) {
         // "https://www.bilibili.com/video/BV1ckMBzmEpv/?spm_id_from=333.1007.tianma.1-1-1.click",
         url,
         "--write-info-json",
+        // "--write-thumbnail",
+        "--proxy",
+        "",
+        // "--cookies",
+        // "/mnt/youtube.txt",
         "-o",
         `${basePath}/%(title)s.mp4`, // 输出文件名
+        // "-o",
+        // `thumbnail:${basePath}/${imgId}`,
+        // "--convert-thumbnails",
+        // "png"
     ];
     return new Promise((resolve, reject) => {
         const proc = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -80,6 +93,17 @@ export function getVideo(params) {
         proc.on("close", async (code) => {
             // console.log(`yt-dlp 退出，退出码 ${code}`);
             if (code === 0) {
+                // const posterPath = `${basePath}/${imgId}.png`;
+                // const imgRes: UploadResponse = await upload({
+                //   url: posterPath,
+                //   deleteAfterDays: 30,
+                //   deleteSource: true,
+                //   filename: `${imgId}.png`,
+                // });
+                // if (imgRes.code === 200) {
+                //   videoInfo.poster = imgRes.data?.url;
+                //   console.log("videoInfo.poster", videoInfo.poster);
+                // }
                 // 上传到qiniu，并更新 url
                 const res = await upload({
                     url: videoInfo.url,
@@ -127,7 +151,7 @@ export function getVideo(params) {
                     onError?.({
                         status: "failed",
                         statusText: ProgressTitle.Failed,
-                        percent: 0,
+                        percent: 1,
                         speed: "",
                         eta: "",
                         info: {
@@ -143,7 +167,7 @@ export function getVideo(params) {
                 onError?.({
                     status: "failed",
                     statusText: ProgressTitle.Failed,
-                    percent: 0,
+                    percent: 2,
                     speed: "",
                     eta: "",
                     info: {

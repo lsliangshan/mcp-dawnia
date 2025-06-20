@@ -47,11 +47,12 @@ export function upload(params) {
                     },
                 });
             }
-            if (respInfo.statusCode == 200) {
+            if (respInfo && respInfo.statusCode == 200) {
                 if (params.deleteSource) {
                     unlinkSync(params.url);
                 }
                 params.onProgress?.({ percent: 100 });
+                console.log("respBody", respBody);
                 resolve({
                     code: 200,
                     data: {
@@ -62,7 +63,7 @@ export function upload(params) {
             }
             else {
                 resolve({
-                    code: respInfo.statusCode,
+                    code: respInfo ? respInfo.statusCode : 1001,
                     data: {
                         ...respBody,
                         originalUrl: params.url,

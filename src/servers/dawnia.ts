@@ -7,6 +7,8 @@ import axios from "axios";
 
 const queues = new Map<string, Array<(msg: ProgressInfo) => void>>();
 
+const HostName = 'liangqy.com';
+
 const ServerName = "dawnia";
 
 const server = new FastMCP({
@@ -33,7 +35,7 @@ server.addTool({
   }),
   execute: async (args: any) => {
     const { id, nickname, userId } = args;
-    console.log(`https://omniplay-progress.qyflows.com/${id}`);
+    console.log(`https://omniplay-progress.${HostName}/${id}`);
     const listeners: Array<(d: unknown) => void> = [];
     queues.set(id, listeners);
 
@@ -48,28 +50,28 @@ server.addTool({
           queues.get(id)?.forEach((fn) => fn({ ...info, percent: 100 }));
           console.log(`[3333info]: `, JSON.stringify(info));
 
-          axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
+          axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
             code: 200,
             id,
             nickname,
             userId,
             data: {
-              ...info,
+              ...(info.info || {}),
             },
           });
         },
         onError: (info: ProgressInfo) => {
           queues.delete(id);
-          console.log(`[3333error]: ${info}`);
-          axios.post("https://wf.qyflows.com/webhook/omniplay/video-download", {
-            code: 1001,
-            id,
-            nickname,
-            userId,
-            data: {
-              ...info,
-            },
-          });
+          console.log(`[3333error]: `, JSON.stringify(info));
+          // axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
+          //   code: 1001,
+          //   id,
+          //   nickname,
+          //   userId,
+          //   data: {
+          //     ...(info.info || {}),
+          //   },
+          // });
         },
       });
       return {

@@ -9,6 +9,7 @@ const ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
 const SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
 
 const bucket = "static-dei2";
+// const bucket = "static-qyflows";
 
 export interface UploadOptions {
   filename?: string;
@@ -81,11 +82,12 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
           });
         }
 
-        if (respInfo.statusCode == 200) {
+        if (respInfo && respInfo.statusCode == 200) {
           if (params.deleteSource) {
             unlinkSync(params.url);
           }
           params.onProgress?.({ percent: 100 });
+          console.log("respBody", respBody);
           resolve({
             code: 200,
             data: {
@@ -96,7 +98,7 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
           });
         } else {
           resolve({
-            code: respInfo.statusCode,
+            code: respInfo ? respInfo.statusCode : 1001,
             data: {
               ...respBody,
               originalUrl: params.url,
