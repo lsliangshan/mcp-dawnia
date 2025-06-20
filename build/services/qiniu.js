@@ -52,7 +52,6 @@ export function upload(params) {
                     unlinkSync(params.url);
                 }
                 params.onProgress?.({ percent: 100 });
-                console.log("respBody", respBody);
                 resolve({
                     code: 200,
                     data: {

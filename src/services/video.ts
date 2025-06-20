@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
-import { readFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, unlinkSync } from "node:fs";
 import { upload, UploadResponse } from "./qiniu.js";
-import axios from "axios";
 import { getRandomId } from "../utils/random.js";
 
 enum ProgressTitle {

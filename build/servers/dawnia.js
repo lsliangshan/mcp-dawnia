@@ -42,7 +42,7 @@ server.addTool({
                 onEnd: (info) => {
                     // queues.delete(id);
                     queues.get(id)?.forEach((fn) => fn({ ...info, percent: 100 }));
-                    console.log(`[3333info]: `, JSON.stringify(info));
+                    // console.log(`[3333info]: `, JSON.stringify(info));
                     axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
                         code: 200,
                         id,
@@ -55,16 +55,16 @@ server.addTool({
                 },
                 onError: (info) => {
                     queues.delete(id);
-                    console.log(`[3333error]: `, JSON.stringify(info));
-                    // axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
-                    //   code: 1001,
-                    //   id,
-                    //   nickname,
-                    //   userId,
-                    //   data: {
-                    //     ...(info.info || {}),
-                    //   },
-                    // });
+                    // console.log(`[3333error]: `, JSON.stringify(info));
+                    axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
+                        code: 1001,
+                        id,
+                        nickname,
+                        userId,
+                        data: {
+                            ...(info.info || {}),
+                        },
+                    });
                 },
             });
             return {
@@ -307,8 +307,6 @@ app.get("/:id", (req, res) => {
        v = ev.data;
         }
       v = Math.max(0, Math.min(100, Number(v)));
-
-      console.log('>>>>> ', JSON.stringify(obj));
 
       fill.style.width = v + '%';
       text.textContent = isNaN(v) ? '连接中...' : (v.toFixed(2) + '%');
