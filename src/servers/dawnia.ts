@@ -225,7 +225,7 @@ app.get("/progress/:id", (req, res) => {
   const push = (data: unknown) => res.write(`data:${JSON.stringify(data)}\n\n`);
   queues.get(id)?.push(push); // 注册监听
   
-  push({ connected: true, from: 'test' });
+  push({ connected: true });
 
   const ping = setInterval(() => res.write(":ping\n\n"), 15000);
   req.on("close", () => {

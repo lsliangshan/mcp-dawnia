@@ -88,6 +88,9 @@ export function getVideo(params) {
     if (process.env.HOST_NAME !== "qyflows.com") {
         args.push("--proxy", "");
     }
+    if (process.env.HOST_NAME === "qyflows.com") {
+        args.push("--cookies", "/mnt/youtube.txt");
+    }
     return new Promise((resolve, reject) => {
         const proc = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
         onStart?.();
@@ -96,7 +99,7 @@ export function getVideo(params) {
         proc.stderr.setEncoding("utf8");
         proc.stderr.on("data", (d) => console.error("[yt-dlp]", d.trim()));
         proc.on("close", async (code) => {
-            console.log(`yt-dlp 退出，退出码 ${code}`);
+            // console.log(`yt-dlp 退出，退出码 ${code}`);
             if (code === 0) {
                 // const posterPath = `${basePath}/${imgId}.png`;
                 // const imgRes: UploadResponse = await upload({
@@ -109,7 +112,6 @@ export function getVideo(params) {
                 //   videoInfo.poster = imgRes.data?.url;
                 //   console.log("videoInfo.poster", videoInfo.poster);
                 // }
-                console.log("videoInfo.url", videoInfo.url);
                 // 上传到qiniu，并更新 url
                 const res = await upload({
                     url: videoInfo.url,
