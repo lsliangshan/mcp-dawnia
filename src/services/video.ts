@@ -16,6 +16,7 @@ export interface ProgressInfo {
   percent: number;
   speed: string;
   eta: string;
+  total: string;
   info?: {
     name: string;
     poster: string;
@@ -44,6 +45,9 @@ export function getVideo(params: {
 
   let videoJsonFile = "";
 
+  const imgId = `img-${getRandomId()}`;
+  const videoId = `video-${getRandomId()}`;
+
   /**
    * 根据官方默认格式提取百分比/速度/ETA
    * 示例行："[download]  42.5% of 4.96MiB at  3.10MiB/s ETA 00:01"
@@ -61,7 +65,7 @@ export function getVideo(params: {
         const info = JSON.parse(readFileSync(videoJsonFile, "utf-8"));
         videoInfo.name = info.title;
         videoInfo.poster = info.thumbnail;
-        videoInfo.url = `${basePath}/${info.title}.mp4`;
+        videoInfo.url = `${basePath}/${videoId}.mp4`;
 
         unlinkSync(videoJsonFile);
       }
@@ -76,7 +80,7 @@ export function getVideo(params: {
       // eta: 剩余时间，如 00:01
       const [, percent, speed, eta] = m;
 
-      // console.log(`当前进度：${percent}%  速度：${speed}  剩余：${eta}`);
+      console.log(`当前进度：${percent}%  速度：${speed}  剩余：${eta}`);
 
       onProgress?.({
         status: "analyzing",
@@ -84,12 +88,11 @@ export function getVideo(params: {
         percent: isNaN(Number(percent)) ? 0 : Number(percent),
         speed,
         eta,
+        total: '',
         info: { ...videoInfo },
       });
     }
   }
-
-  const imgId = `img-${getRandomId()}`;
 
   // 构造参数数组而不是整串命令，避免 Windows / Linux 转义差异
   const args = [
@@ -103,17 +106,21 @@ export function getVideo(params: {
     url,
     "--write-info-json",
     // "--write-thumbnail",
-    "--proxy",
-    "",
+    // "--proxy",
+    // "",
     // "--cookies",
     // "/mnt/youtube.txt",
     "-o",
-    `${basePath}/%(title)s.mp4`, // 输出文件名
+    `${basePath}/${videoId}.mp4`, // 输出文件名
     // "-o",
     // `thumbnail:${basePath}/${imgId}`,
     // "--convert-thumbnails",
     // "png"
   ];
+
+  if (process.env.HOST_NAME !== "qyflows.com") {
+    args.push("--proxy", "");
+  }
 
   return new Promise((resolve, reject) => {
     const proc = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -127,7 +134,7 @@ export function getVideo(params: {
     proc.stderr.on("data", (d) => console.error("[yt-dlp]", d.trim()));
 
     proc.on("close", async (code) => {
-      // console.log(`yt-dlp 退出，退出码 ${code}`);
+      console.log(`yt-dlp 退出，退出码 ${code}`);
       if (code === 0) {
 
         // const posterPath = `${basePath}/${imgId}.png`;
@@ -142,7 +149,7 @@ export function getVideo(params: {
         //   videoInfo.poster = imgRes.data?.url;
         //   console.log("videoInfo.poster", videoInfo.poster);
         // }
-
+        console.log("videoInfo.url", videoInfo.url);
         // 上传到qiniu，并更新 url
         const res: UploadResponse = await upload({
           url: videoInfo.url,
@@ -153,8 +160,9 @@ export function getVideo(params: {
               status: "uploading",
               statusText: ProgressTitle.Uploading,
               percent: info.percent,
-              speed: "",
-              eta: "",
+              speed: info.speed,
+              eta: info.eta,
+              total: info.total,
               info: { ...videoInfo },
             });
           },
@@ -168,6 +176,7 @@ export function getVideo(params: {
             percent: 100,
             speed: "",
             eta: "",
+            total: "",
             info: {
               name: videoInfo.name,
               poster: videoInfo.poster,
@@ -193,6 +202,7 @@ export function getVideo(params: {
             percent: 1,
             speed: "",
             eta: "",
+            total: "",
             info: {
               name: videoInfo.name,
               poster: videoInfo.poster,
@@ -208,6 +218,7 @@ export function getVideo(params: {
           percent: 2,
           speed: "",
           eta: "",
+          total: "",
           info: {
             name: videoInfo.name,
             poster: videoInfo.poster,

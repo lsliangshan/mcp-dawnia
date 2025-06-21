@@ -1,0 +1,67 @@
+<svg
+    data-v-2756d866=""
+    id="shape_zVhKvkRegS"
+    data-noselect=""
+    viewBox="0 0 120 120"
+    width="120"
+    height="120"
+    preserveAspectRatio="none"
+    version="1.1"
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+  >
+    <defs data-v-2756d866=""></defs>
+    <!---->
+    <g data-v-2756d866="" mask="">
+      <g
+        data-v-2756d866=""
+        transform="translate(10,10) rotate(0,51.638070510889136,50.408678987384675) scale(1,1)"
+        filter=""
+        style="opacity: 1"
+      >
+        <g data-v-2756d866="">
+          <svg
+            version="1.1"
+            id="图层_1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+            x="0px"
+            y="0px"
+            width="103"
+            height="103"
+            viewBox="0 0 142 142"
+            style="enable-background: new 0 0 142 142"
+            xml:space="preserve"
+            class="style-removed"
+            preserveAspectRatio="none"
+            data-parent="shape_zVhKvkRegS"
+          >
+            <g>
+              <g>
+                <g>
+                  <path
+                    d="M67.86,139C30.44,139,0,108.56,0,71.14S30.44,3.29,67.86,3.29c10.19,0,20,2.21,29.15,6.57
+				c5.57,2.65,7.94,9.32,5.28,14.9c-2.65,5.57-9.32,7.94-14.9,5.28c-6.12-2.92-12.69-4.39-19.54-4.39
+				c-25.09,0-45.51,20.41-45.51,45.51s20.41,45.51,45.51,45.51s45.51-20.41,45.51-45.51c0-6.04-1.16-11.9-3.45-17.42
+				c-2.37-5.7,0.34-12.24,6.04-14.61c5.7-2.37,12.24,0.34,14.61,6.04c3.42,8.25,5.16,16.99,5.16,25.99
+				C135.72,108.56,105.28,139,67.86,139z"
+                    fill="#005F84"
+                    stroke-width="0"
+                  ></path>
+                </g>
+              </g>
+              <g>
+                <circle
+                  cx="128.01"
+                  cy="14.38"
+                  r="14.38"
+                  fill="#00B7A5"
+                  stroke-width="0"
+                ></circle>
+              </g>
+            </g>
+          </svg>
+        </g>
+      </g>
+    </g>
+  </svg>

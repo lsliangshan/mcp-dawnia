@@ -4,8 +4,10 @@ import { servers } from "../config/index.js";
 import { getVideo } from "../services/video.js";
 import express from "express";
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
 const queues = new Map();
-const HostName = 'liangqy.com';
+const HostName = process.env.HOST_NAME;
 const ServerName = "dawnia";
 const server = new FastMCP({
     name: servers[ServerName].name,
@@ -31,6 +33,7 @@ server.addTool({
     execute: async (args) => {
         const { id, nickname, userId } = args;
         console.log(`https://omniplay-progress.${HostName}/${id}`);
+        // console.log(`http://127.0.0.1:29060/${id}`);
         const listeners = [];
         queues.set(id, listeners);
         try {
@@ -40,9 +43,11 @@ server.addTool({
                     queues.get(id)?.forEach((fn) => fn(info));
                 },
                 onEnd: (info) => {
-                    // queues.delete(id);
                     queues.get(id)?.forEach((fn) => fn({ ...info, percent: 100 }));
                     // console.log(`[3333info]: `, JSON.stringify(info));
+                    setTimeout(() => {
+                        queues.delete(id);
+                    }, 500);
                     axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
                         code: 200,
                         id,
@@ -204,7 +209,7 @@ app.get("/progress/:id", (req, res) => {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     const push = (data) => res.write(`data:${JSON.stringify(data)}\n\n`);
     queues.get(id)?.push(push); // 注册监听
-    push({ connected: true });
+    push({ connected: true, from: 'test' });
     const ping = setInterval(() => res.write(":ping\n\n"), 15000);
     req.on("close", () => {
         clearInterval(ping);
@@ -219,7 +224,7 @@ app.get("/:id", (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Live Download Progress</title>
+  <title>全娱通视频下载</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     /* layout */
@@ -253,6 +258,11 @@ app.get("/:id", (req, res) => {
       font-weight:600;font-size:1rem;color:#000;
       background:linear-gradient(90deg,#00c9ff,#92fe9d);transition:transform .2s}
     button:hover{transform:scale(1.05)}
+    .info {color: #bbb;}
+    .total-wrapper {color: #bbb;}
+    .speed {margin-left: 6px;}
+    .eta {margin-left: 6px;}
+    .total {margin-left: 6px;}
   </style>
 </head>
 <body>
@@ -261,12 +271,13 @@ app.get("/:id", (req, res) => {
     <h5 class="title"></h5>
     <div class="bar" aria-hidden="true"><div class="fill"></div></div>
     
-    <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-top: 20px;">
-    <div class="info" style="display: flex; flex-direction: column; align-items: flex-start; opacity: 0;">
-        <div>下载速度: <span class="speed"></span></div>
-        <div>剩余时间: <span class="eta"></span></div>
-    </div>
-    <div class="pct" aria-live="polite">0%</div>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; margin-top: 20px;">
+      <div class="info" style="display: flex; flex-direction: column; align-items: flex-start; opacity: 0;">
+          <div><span style="opacity: 0;">下载</span>速度: <span class="speed"></span></div>
+          <div>剩余时间: <span class="eta"></span></div>
+          <div class="total-wrapper"><span style="opacity: 0;">下</span>总大小: <span class="total"></span></div>
+      </div>
+      <div class="pct" aria-live="polite">0%</div>
     </div>
     
   </div>
@@ -280,6 +291,8 @@ app.get("/:id", (req, res) => {
   const info  = document.querySelector('.info');
   const speed  = document.querySelector('.speed');
   const eta  = document.querySelector('.eta');
+  const totalWrapper  = document.querySelector('.total-wrapper');
+  const total  = document.querySelector('.total');
   let source;
 
   /** Open SSE stream and wire events */
@@ -316,12 +329,16 @@ app.get("/:id", (req, res) => {
       info.style.opacity = obj.speed && obj.eta ? '1' : '0';
       speed.textContent = obj.speed || '';
       eta.textContent = obj.eta || '';
+      total.textContent = obj.total || '';
+      totalWrapper.style.display = obj.total ? 'block' : 'none';
 
       if (obj.status === 'completed' && v >= 100){
         text.textContent = '完成';
+        info.style.display = 'none';
         source.close();
       } else if (obj.status === 'failed') {
         text.textContent = '失败';
+        info.style.display = 'none';
         source.close();
       }
     });
@@ -329,6 +346,7 @@ app.get("/:id", (req, res) => {
     source.addEventListener('error', err => {
       console.error('SSE error', err);
       text.textContent = '连接失败';
+      info.style.display = 'none';
       fill.style.width = '0%';
       source.close();
     });
@@ -339,8 +357,6 @@ app.get("/:id", (req, res) => {
 </script>
 </body>
 </html>
-
-
   `); // res.send 会自动加 Content-Type:text/html :contentReference[oaicite:0]{index=0}
 });
 app.listen(29060, () => console.log("SSE 监听 http://localhost:29060"));
