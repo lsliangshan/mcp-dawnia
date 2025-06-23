@@ -1,15 +1,17 @@
-import { createReadStream, statSync, unlinkSync } from "fs";
+import { unlinkSync } from "fs";
 import qiniu from "qiniu";
 import { getRandomId } from "../utils/random.js";
 import { formatAsClock, formatBytes } from "../utils/index.js";
 import dotenv from "dotenv";
 
+qiniu.conf.ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
+qiniu.conf.SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
+
+const ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
+const SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
+
 dotenv.config();
 
-qiniu.conf.ACCESS_KEY = process.env.ACCESS_KEY || "";
-qiniu.conf.SECRET_KEY = process.env.SECRET_KEY || "";
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
 const bucket = process.env.BUCKET_NAME;
 
 export interface UploadOptions {
@@ -19,12 +21,7 @@ export interface UploadOptions {
   deleteAfterDays?: number;
   // 是否删除源文件
   deleteSource?: boolean;
-  onProgress?: (info: {
-    percent: number;
-    speed: string;
-    eta: string;
-    total: string;
-  }) => void;
+  onProgress?: (info: { percent: number, speed: string, eta: string, total: string }) => void;
 }
 
 export interface UploadResponse {
@@ -47,49 +44,7 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
 
     let putPolicy = new qiniu.rs.PutPolicy(options);
     let uploadToken = putPolicy.uploadToken(mac);
-    let config = new qiniu.conf.Config({
-      useHttpsDomain: true, // HTTPS 上传
-      useCdnDomain: true, // 自动使用上传加速域名
-      // regionsProvider: new qiniu.httpc.Region({
-      //   services: {
-      //     up: [
-      //       new qiniu.httpc.Endpoint(
-      //         `static-dei2.kodo-accelerate.cn-south-1.qiniucs.com`,
-      //         { defaultScheme: "https" }
-      //       ),
-      //       new qiniu.httpc.Endpoint(
-      //         `static-qyflows.kodo-accelerate.us-north-1.qiniucs.com`,
-      //         { defaultScheme: "https" }
-      //       ),
-      //     ],
-      //   },
-      // }),
-    });
-
-    if (process.env.BUCKET_HOST === "qyflows.com") {
-      config.regionsProvider = new qiniu.httpc.Region({
-        services: {
-          up: [
-            new qiniu.httpc.Endpoint(
-              `static-qyflows.kodo-accelerate.us-north-1.qiniucs.com`,
-              { defaultScheme: "https" }
-            ),
-          ],
-        },
-      });
-    } else {
-      config.regionsProvider = new qiniu.httpc.Region({
-        services: {
-          up: [
-            new qiniu.httpc.Endpoint(
-              `static-dei2.kodo-accelerate.cn-south-1.qiniucs.com`,
-              { defaultScheme: "https" }
-            ),
-          ],
-        },
-      });
-    }
-
+    let config = new qiniu.conf.Config();
     let resumeUploader = new qiniu.resume_up.ResumeUploader(config);
 
     let putExtra = new qiniu.resume_up.PutExtra();
@@ -98,28 +53,22 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
       "x:age": "27",
     };
     putExtra.fname = filename;
-    putExtra.version = "v2";
-    putExtra.partSize = 1024 * 1024 * 10; // 分片大小 10MB
-    // putExtra.resumeRecordFile = "progress.log";
-    const stream = createReadStream(params.url);
-    const streamSize = statSync(params.url).size;
 
-    let start = Date.now(),
-      last = start,
-      lastBytes = 0;
-    let total = "";
+
+    let start = Date.now(), last = start, lastBytes = 0;
+    let total = '';
 
     // putExtra.resumeRecordFile = 'progress.log'
     putExtra.progressCallback = (uploadBytes, totalBytes) => {
       // console.log('progress: ', uploadBytes + ' / ' + totalBytes, parseFloat(uploadBytes * 100 / totalBytes).toFixed(2) + '%')
-      const now = Date.now();
-      const deltaT = (now - last) / 1000; // 秒
-      const deltaB = uploadBytes - lastBytes; // 字节
+      const now   = Date.now();
+      const deltaT = (now - last) / 1000;                 // 秒
+      const deltaB = uploadBytes - lastBytes;           // 字节
 
-      const instantSpeed = deltaB / deltaT; // B/s
-      const avgSpeed = uploadBytes / ((now - start) / 1000);
-      const remainBytes = totalBytes - uploadBytes;
-      const eta = parseInt(`${remainBytes / avgSpeed}`); // 秒
+      const instantSpeed = deltaB / deltaT;               // B/s
+      const avgSpeed     = uploadBytes / ((now - start) / 1000);
+      const remainBytes  = totalBytes - uploadBytes;
+      const eta          = parseInt(`${remainBytes / avgSpeed}`);        // 秒
 
       total = `${formatBytes(totalBytes)}`;
 
@@ -133,13 +82,14 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
           100,
           Number(parseFloat(`${(uploadBytes * 100) / totalBytes}`).toFixed(2))
         ),
-        speed: `${(instantSpeed / 1024 / 1024).toFixed(2)} MB/s`,
+        speed: `${(instantSpeed/1024/1024).toFixed(2)} MB/s`,
         eta: `${formatAsClock(eta)}`,
         total,
       });
 
       last = now;
       lastBytes = uploadBytes;
+      
     };
 
     let _url = params.url;
@@ -147,11 +97,10 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
     //   _url = path.resolve(REMOTE_TMP_PATH, _url.split('?').pop() + '.vue')
     //   // _url = '/tmp/com.dei2.blue-bird/tmp/' + _url.split('?').pop() + '.vue'
     // }
-    resumeUploader.putStream(
+    resumeUploader.putFile(
       uploadToken,
       key,
-      stream,
-      streamSize,
+      _url,
       putExtra,
       (respErr, respBody, respInfo) => {
         if (respErr) {
@@ -168,12 +117,13 @@ export function upload(params: UploadOptions): Promise<UploadResponse> {
           if (params.deleteSource) {
             unlinkSync(params.url);
           }
-          params.onProgress?.({ percent: 100, speed: "", eta: "", total });
-
+          params.onProgress?.({ percent: 100, speed: '', eta: '', total });
+          
           resolve({
             code: 200,
             data: {
-              url: `https://img.${process.env.BUCKET_HOST}/${respBody.key}?${respBody.hash}`,
+              url:
+                `https://img.${process.env.HOST_NAME}/${respBody.key}?${respBody.hash}`,
               originalUrl: params.url,
             },
           });

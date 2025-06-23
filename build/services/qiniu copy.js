@@ -1,13 +1,13 @@
-import { createReadStream, statSync, unlinkSync } from "fs";
+import { unlinkSync } from "fs";
 import qiniu from "qiniu";
 import { getRandomId } from "../utils/random.js";
 import { formatAsClock, formatBytes } from "../utils/index.js";
 import dotenv from "dotenv";
+qiniu.conf.ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
+qiniu.conf.SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
+const ACCESS_KEY = "6aCSaA_wdWLuwjvqw7ozq33AsE69J4GWnZVSXZuF";
+const SECRET_KEY = "d0y5or3horeFQLZ_vS7XfqLplK6iNOWWQxs7G5j3";
 dotenv.config();
-qiniu.conf.ACCESS_KEY = process.env.ACCESS_KEY || "";
-qiniu.conf.SECRET_KEY = process.env.SECRET_KEY || "";
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
 const bucket = process.env.BUCKET_NAME;
 export function upload(params) {
     return new Promise((resolve) => {
@@ -20,42 +20,7 @@ export function upload(params) {
         };
         let putPolicy = new qiniu.rs.PutPolicy(options);
         let uploadToken = putPolicy.uploadToken(mac);
-        let config = new qiniu.conf.Config({
-            useHttpsDomain: true, // HTTPS 上传
-            useCdnDomain: true, // 自动使用上传加速域名
-            // regionsProvider: new qiniu.httpc.Region({
-            //   services: {
-            //     up: [
-            //       new qiniu.httpc.Endpoint(
-            //         `static-dei2.kodo-accelerate.cn-south-1.qiniucs.com`,
-            //         { defaultScheme: "https" }
-            //       ),
-            //       new qiniu.httpc.Endpoint(
-            //         `static-qyflows.kodo-accelerate.us-north-1.qiniucs.com`,
-            //         { defaultScheme: "https" }
-            //       ),
-            //     ],
-            //   },
-            // }),
-        });
-        if (process.env.BUCKET_HOST === "qyflows.com") {
-            config.regionsProvider = new qiniu.httpc.Region({
-                services: {
-                    up: [
-                        new qiniu.httpc.Endpoint(`static-qyflows.kodo-accelerate.us-north-1.qiniucs.com`, { defaultScheme: "https" }),
-                    ],
-                },
-            });
-        }
-        else {
-            config.regionsProvider = new qiniu.httpc.Region({
-                services: {
-                    up: [
-                        new qiniu.httpc.Endpoint(`static-dei2.kodo-accelerate.cn-south-1.qiniucs.com`, { defaultScheme: "https" }),
-                    ],
-                },
-            });
-        }
+        let config = new qiniu.conf.Config();
         let resumeUploader = new qiniu.resume_up.ResumeUploader(config);
         let putExtra = new qiniu.resume_up.PutExtra();
         putExtra.params = {
@@ -63,13 +28,8 @@ export function upload(params) {
             "x:age": "27",
         };
         putExtra.fname = filename;
-        putExtra.version = "v2";
-        putExtra.partSize = 1024 * 1024 * 10; // 分片大小 10MB
-        // putExtra.resumeRecordFile = "progress.log";
-        const stream = createReadStream(params.url);
-        const streamSize = statSync(params.url).size;
         let start = Date.now(), last = start, lastBytes = 0;
-        let total = "";
+        let total = '';
         // putExtra.resumeRecordFile = 'progress.log'
         putExtra.progressCallback = (uploadBytes, totalBytes) => {
             // console.log('progress: ', uploadBytes + ' / ' + totalBytes, parseFloat(uploadBytes * 100 / totalBytes).toFixed(2) + '%')
@@ -100,7 +60,7 @@ export function upload(params) {
         //   _url = path.resolve(REMOTE_TMP_PATH, _url.split('?').pop() + '.vue')
         //   // _url = '/tmp/com.dei2.blue-bird/tmp/' + _url.split('?').pop() + '.vue'
         // }
-        resumeUploader.putStream(uploadToken, key, stream, streamSize, putExtra, (respErr, respBody, respInfo) => {
+        resumeUploader.putFile(uploadToken, key, _url, putExtra, (respErr, respBody, respInfo) => {
             if (respErr) {
                 resolve({
                     code: 100,
@@ -114,11 +74,11 @@ export function upload(params) {
                 if (params.deleteSource) {
                     unlinkSync(params.url);
                 }
-                params.onProgress?.({ percent: 100, speed: "", eta: "", total });
+                params.onProgress?.({ percent: 100, speed: '', eta: '', total });
                 resolve({
                     code: 200,
                     data: {
-                        url: `https://img.${process.env.BUCKET_HOST}/${respBody.key}?${respBody.hash}`,
+                        url: `https://img.${process.env.HOST_NAME}/${respBody.key}?${respBody.hash}`,
                         originalUrl: params.url,
                     },
                 });

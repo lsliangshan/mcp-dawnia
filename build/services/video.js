@@ -50,14 +50,14 @@ export function getVideo(params) {
             // speed: 速度，如 3.10MiB/s
             // eta: 剩余时间，如 00:01
             const [, percent, speed, eta] = m;
-            console.log(`当前进度：${percent}%  速度：${speed}  剩余：${eta}`);
+            // console.log(`当前进度：${percent}%  速度：${speed}  剩余：${eta}`);
             onProgress?.({
                 status: "analyzing",
                 statusText: ProgressTitle.Analyzing,
                 percent: isNaN(Number(percent)) ? 0 : Number(percent),
                 speed,
                 eta,
-                total: '',
+                total: "",
                 info: { ...videoInfo },
             });
         }
@@ -85,11 +85,16 @@ export function getVideo(params) {
         // "--convert-thumbnails",
         // "png"
     ];
-    if (process.env.HOST_NAME !== "qyflows.com") {
-        args.push("--proxy", "");
-    }
-    if (process.env.HOST_NAME === "qyflows.com") {
+    const externalSite = ["googlevideo.com", "youtube.com"];
+    const isExternalSite = externalSite.some((site) => params.url.includes(site));
+    if (isExternalSite) {
         args.push("--cookies", "/mnt/youtube.txt");
+        args.push("--write-thumbnail");
+        args.push("-o", `thumbnail:${basePath}/${imgId}`);
+        args.push("--convert-thumbnails", "png");
+    }
+    else {
+        args.push("--proxy", "");
     }
     return new Promise((resolve, reject) => {
         const proc = spawn("yt-dlp", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -101,17 +106,19 @@ export function getVideo(params) {
         proc.on("close", async (code) => {
             // console.log(`yt-dlp 退出，退出码 ${code}`);
             if (code === 0) {
-                // const posterPath = `${basePath}/${imgId}.png`;
-                // const imgRes: UploadResponse = await upload({
-                //   url: posterPath,
-                //   deleteAfterDays: 30,
-                //   deleteSource: true,
-                //   filename: `${imgId}.png`,
-                // });
-                // if (imgRes.code === 200) {
-                //   videoInfo.poster = imgRes.data?.url;
-                //   console.log("videoInfo.poster", videoInfo.poster);
-                // }
+                if (isExternalSite) {
+                    const posterPath = `${basePath}/${imgId}.png`;
+                    const imgRes = await upload({
+                        url: posterPath,
+                        deleteAfterDays: 30,
+                        deleteSource: true,
+                        filename: `${imgId}.png`,
+                    });
+                    // console.log("imgRes", imgRes);
+                    if (imgRes.code === 200) {
+                        videoInfo.poster = imgRes.data?.url;
+                    }
+                }
                 // 上传到qiniu，并更新 url
                 const res = await upload({
                     url: videoInfo.url,
