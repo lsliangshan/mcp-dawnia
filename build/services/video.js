@@ -8,6 +8,7 @@ var ProgressTitle;
     ProgressTitle["Uploading"] = "\u89C6\u9891\u4E0A\u4F20\u4E2D";
     ProgressTitle["Completed"] = "\u89C6\u9891\u4E0B\u8F7D\u5B8C\u6210";
     ProgressTitle["Failed"] = "\u89C6\u9891\u4E0B\u8F7D\u5931\u8D25";
+    ProgressTitle["NotAvailable"] = "\u64CD\u4F5C\u5931\u8D25\uFF0C\u6211\u53EA\u652F\u6301\u4E0B\u8F7DBilibili\u7B49\u89C6\u9891";
 })(ProgressTitle || (ProgressTitle = {}));
 export function getVideo(params) {
     const { url, onProgress, onEnd, onStart, onError } = params;
@@ -32,6 +33,17 @@ export function getVideo(params) {
             videoJsonFile = line
                 .split("Writing video metadata as JSON to: ")[1]
                 .trim();
+        }
+        if (line.includes("WARNING")) {
+            onError?.({
+                status: "failed",
+                statusText: ProgressTitle.NotAvailable,
+                percent: 1,
+                speed: "",
+                eta: "",
+                total: "",
+            });
+            return;
         }
         setTimeout(() => {
             if (!videoInfo.name && existsSync(videoJsonFile)) {
@@ -102,7 +114,31 @@ export function getVideo(params) {
         proc.stdout.setEncoding("utf8"); // 以字符串接收
         proc.stdout.on("data", handleLine); // 监听一行行输出
         proc.stderr.setEncoding("utf8");
-        proc.stderr.on("data", (d) => console.error("[yt-dlp]", d.trim()));
+        proc.stderr.on("data", (d) => {
+            const errorMessage = d.trim();
+            if (errorMessage.includes("Requested format is not available")) {
+                onError?.({
+                    status: "failed",
+                    statusText: ProgressTitle.NotAvailable,
+                    percent: 1,
+                    speed: "",
+                    eta: "",
+                    total: "",
+                });
+                reject(new Error(errorMessage));
+                return;
+            }
+            onError?.({
+                status: "failed",
+                statusText: ProgressTitle.NotAvailable,
+                percent: 1,
+                speed: "",
+                eta: "",
+                total: "",
+            });
+            reject(new Error(errorMessage));
+            console.error("[yt-dlp]", d.trim());
+        });
         proc.on("close", async (code) => {
             // console.log(`yt-dlp 退出，退出码 ${code}`);
             if (code === 0) {

@@ -56,28 +56,38 @@ server.addTool({
             queues.delete(id);
           }, 500);
 
-          axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
-            code: 200,
-            id,
-            nickname,
-            userId,
-            data: {
-              ...(info.info || {}),
-            },
-          });
+          if (!id.startsWith("assistant-")) {
+            axios.post(
+              `https://wf.${HostName}/webhook/omniplay/video-download`,
+              {
+                code: 200,
+                id,
+                nickname,
+                userId,
+                data: {
+                  ...(info.info || {}),
+                },
+              }
+            );
+          }
         },
         onError: (info: ProgressInfo) => {
           queues.delete(id);
           // console.log(`[3333error]: `, JSON.stringify(info));
-          axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
-            code: 1001,
-            id,
-            nickname,
-            userId,
-            data: {
-              ...(info.info || {}),
-            },
-          });
+          if (!id.startsWith("assistant-")) {
+            axios.post(
+              `https://wf.${HostName}/webhook/omniplay/video-download`,
+              {
+                code: 1001,
+                id,
+                nickname,
+                userId,
+                data: {
+                  ...(info.info || {}),
+                },
+              }
+            );
+          }
         },
       });
       return {
@@ -224,7 +234,7 @@ app.get("/progress/:id", (req, res) => {
 
   const push = (data: unknown) => res.write(`data:${JSON.stringify(data)}\n\n`);
   queues.get(id)?.push(push); // 注册监听
-  
+
   push({ connected: true });
 
   const ping = setInterval(() => res.write(":ping\n\n"), 15000);

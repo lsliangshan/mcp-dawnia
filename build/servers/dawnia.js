@@ -48,28 +48,32 @@ server.addTool({
                     setTimeout(() => {
                         queues.delete(id);
                     }, 500);
-                    axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
-                        code: 200,
-                        id,
-                        nickname,
-                        userId,
-                        data: {
-                            ...(info.info || {}),
-                        },
-                    });
+                    if (!id.startsWith("assistant-")) {
+                        axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
+                            code: 200,
+                            id,
+                            nickname,
+                            userId,
+                            data: {
+                                ...(info.info || {}),
+                            },
+                        });
+                    }
                 },
                 onError: (info) => {
                     queues.delete(id);
                     // console.log(`[3333error]: `, JSON.stringify(info));
-                    axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
-                        code: 1001,
-                        id,
-                        nickname,
-                        userId,
-                        data: {
-                            ...(info.info || {}),
-                        },
-                    });
+                    if (!id.startsWith("assistant-")) {
+                        axios.post(`https://wf.${HostName}/webhook/omniplay/video-download`, {
+                            code: 1001,
+                            id,
+                            nickname,
+                            userId,
+                            data: {
+                                ...(info.info || {}),
+                            },
+                        });
+                    }
                 },
             });
             return {

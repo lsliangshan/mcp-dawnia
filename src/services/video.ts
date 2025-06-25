@@ -8,6 +8,7 @@ enum ProgressTitle {
   Uploading = "视频上传中",
   Completed = "视频下载完成",
   Failed = "视频下载失败",
+  NotAvailable = "操作失败，我只支持下载Bilibili等视频",
 }
 
 export interface ProgressInfo {
@@ -57,6 +58,18 @@ export function getVideo(params: {
       videoJsonFile = line
         .split("Writing video metadata as JSON to: ")[1]
         .trim();
+    }
+
+    if (line.includes("WARNING")) {
+      onError?.({
+        status: "failed",
+        statusText: ProgressTitle.NotAvailable,
+        percent: 1,
+        speed: "",
+        eta: "",
+        total: "",
+      });
+      return;
     }
 
     setTimeout(() => {
@@ -139,7 +152,31 @@ export function getVideo(params: {
     proc.stdout.on("data", handleLine); // 监听一行行输出
 
     proc.stderr.setEncoding("utf8");
-    proc.stderr.on("data", (d) => console.error("[yt-dlp]", d.trim()));
+    proc.stderr.on("data", (d) => {
+      const errorMessage = d.trim();
+      if (errorMessage.includes("Requested format is not available")) {
+        onError?.({
+          status: "failed",
+          statusText: ProgressTitle.NotAvailable,
+          percent: 1,
+          speed: "",
+          eta: "",
+          total: "",
+        });
+        reject(new Error(errorMessage));
+        return;
+      }
+      onError?.({
+        status: "failed",
+        statusText: ProgressTitle.NotAvailable,
+        percent: 1,
+        speed: "",
+        eta: "",
+        total: "",
+      });
+      reject(new Error(errorMessage));
+      console.error("[yt-dlp]", d.trim());
+    });
 
     proc.on("close", async (code) => {
       // console.log(`yt-dlp 退出，退出码 ${code}`);
